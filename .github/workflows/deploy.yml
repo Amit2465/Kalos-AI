@@ -1,0 +1,42 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Connect & Deploy to EC2
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_KEY }}  
+        port: 22                          
+        script: |
+          cd ${{ secrets.PROJECT_PATH }}
+          git pull origin main
+          
+          # Stop existing containers
+          docker-compose down
+          
+          # Build and start containers
+          docker-compose up -d --build
+          
+          # Install Python dependencies for local development/testing
+          source .venv/bin/activate
+          pip install -r requirements.txt
+          
+          # Restart FastAPI service if it exists
+          sudo systemctl restart fastapi.service || true
+          
+          # Check container health
+          docker-compose ps
+          docker-compose logs --tail=20
